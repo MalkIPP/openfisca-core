@@ -89,6 +89,7 @@ class Column(object):
         if val_type is not None and val_type != self.val_type:
             self.val_type = val_type
 
+
     def to_json(self):
         self_json = collections.OrderedDict((
             ('@type', self.json_type),
