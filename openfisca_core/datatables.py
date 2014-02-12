@@ -88,7 +88,15 @@ class DataTable(object):
 
     def load_data_from_test_case(self, test_case):
         self.test_case = test_case
+#         if test_case.nmen == 1:
+#             test_case.dummy_x_axis = True
+#             test_case.nmen = 2
+#             test_case.populate_datatable(self)
+#             del test_case.dummy_x_axis
+#             test_case.nmen = 1
+#         else:
         test_case.populate_datatable(self)
+
 
     def load_data_from_survey(self, survey_data,
                               num_table = 1,
@@ -616,9 +624,9 @@ class DataTable(object):
 
         if self.num_table == 1:
             if isinstance(value, int):
-                values = Series(value, dtype = col._dtype).values
+                values = Series(value, dtype = dtyp).values
             else:
-                values = Series(value[idx['idxUnit'].tolist()], dtype = col._dtype).values
+                values = Series(value[idx['idxUnit'].tolist()], dtype = dtyp).values
 
             self.table[varname][idx['idxIndi'].tolist()] = values  # tolist because sometime len(idx['idxIndi']) == 1
         elif self.num_table == 3:
