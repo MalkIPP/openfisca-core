@@ -607,8 +607,12 @@ class DataTable(object):
             idx = self.index[entity][0]
         else:
             idx = self.index[entity][opt]
-        col = self.column_by_name.get(varname)
-        assert col is not None, 'Error when getting column %s' % varname
+        try:
+            col = self.column_by_name.get(varname)
+            dtyp = col._dtype
+        except Exception as e:
+            print e
+            raise Exception('Error when getting column %s' % varname)
 
         if self.num_table == 1:
             if isinstance(value, int):

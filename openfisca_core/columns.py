@@ -72,22 +72,21 @@ class Column(object):
     start = None
     val_type = None
 
-    def __init__(self, label = None, default = None, entity= None, start = None, end = None, val_type = None,
-            freq = None, legislative_input = True):
+
+    def __init__(self, label = None, default = None, entity = 'ind', start = None, end = None, val_type = None,
+            freq = 'year', legislative_input = True):
         if default is not None and default != self._default:
             self._default = default
-        if end is not None:
-            self.end = end
-        self.entity = entity or 'ind'
-        self.freq = freq or 'year'
-        if label is not None:
-            self.label = label
+        self.end = end
+        self.entity = entity
+        self.freq = freq
+        self.label = label
         if legislative_input:
             self.legislative_input = True
-        if start is not None:
-            self.start = start
+        self.start = start
         if val_type is not None and val_type != self.val_type:
             self.val_type = val_type
+
 
     def to_json(self):
         self_json = collections.OrderedDict((
@@ -286,17 +285,26 @@ class Prestation(Column):
     inputs = None
     json_type = 'Float'
 
-    def __init__(self, func, entity = None, label = None, start = None, end = None, val_type = None, freq = None):
-        super(Prestation, self).__init__(label = label, entity = entity, start = start, end = end, val_type = val_type,
-            freq = freq)
+    def __init__(self, func, entity = 'ind', label = None, start = None, end = None, val_type = None, freq = "year"):
+        super(Prestation, self).__init__(label = label, entity = entity, start = start, end = end, val_type = val_type, freq = freq)
+
+        assert func is not None, 'A function to compute the prestation should be provided'
 
         self._children  = set()  # prestations immediately affected by current prestation
         self._freq = {}
         assert func is not None, 'A function to compute the prestation should be provided'
         self._func = func
-        self._option = {}
-        self._parents = set()  # prestations that current prestations depends on
+        self._start = start
+        self._end = end
+        self._val_type = val_type
+        self.entity = entity  # TODO: is this needed ?
+
         self.inputs = set(func.__code__.co_varnames[:func.__code__.co_argcount])
+        self._children = set()  # prestations immidiately affected by current prestation
+        self._parents = set()  # prestations that current prestations depends on
+
+        # by default enable all the prestations
+        self._enabled = True
 
         # Check if function func needs parameter tree _P.
         if '_P' in self.inputs:
