@@ -70,10 +70,11 @@ class Column(object):
     legislative_input = False
     name = None
     start = None
+    survey_only = False
     val_type = None
 
-    def __init__(self, label = None, default = None, entity= None, start = None, end = None, val_type = None,
-            freq = None, legislative_input = True):
+    def __init__(self, label = None, default = None, entity = None, start = None, end = None, val_type = None,
+            freq = None, legislative_input = True, survey_only = False):
         if default is not None and default != self._default:
             self._default = default
         if end is not None:
@@ -86,6 +87,8 @@ class Column(object):
             self.legislative_input = True
         if start is not None:
             self.start = start
+        if survey_only:
+            self.survey_only = True
         if val_type is not None and val_type != self.val_type:
             self.val_type = val_type
 
@@ -291,11 +294,12 @@ class Prestation(Column):
     inputs = None
     json_type = 'Float'
 
-    def __init__(self, func, entity = None, label = None, start = None, end = None, val_type = None, freq = None):
+    def __init__(self, func, entity = None, label = None, start = None, end = None, val_type = None, freq = None,
+            survey_only = False):
         super(Prestation, self).__init__(label = label, entity = entity, start = start, end = end, val_type = val_type,
-            freq = freq)
+            freq = freq, survey_only = survey_only)
 
-        self._children  = set()  # prestations immediately affected by current prestation
+        self._children = set()  # prestations immediately affected by current prestation
         self._freq = {}
         assert func is not None, 'A function to compute the prestation should be provided'
         self._func = func
