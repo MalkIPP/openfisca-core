@@ -61,10 +61,11 @@ setup(
         ('share/locale/fr/LC_MESSAGES', ['openfisca_core/i18n/fr/LC_MESSAGES/openfisca-core.mo']),
         ],
     install_requires = [
-        "Babel >= 0.9.4",
-        'Biryani1 >= 0.9dev',
-        "numpy",
-        "pandas >= 0.13.0",
+        'Babel >= 0.9.4',
+        'Biryani1[datetimeconv] >= 0.9dev',
+        'numpy',
+        'pandas >= 0.13',
+        'tables',
         ],
     message_extractors = {
         'openfisca_core': [
