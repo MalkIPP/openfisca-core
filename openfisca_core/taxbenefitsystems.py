@@ -26,14 +26,8 @@
 import collections
 import xml.etree.ElementTree
 import weakref
-#from xml.dom import minidom
 
-import numpy as np
-from pandas import DataFrame
-
-#from . import conv, decompositions, legislations, legislationsxml
 from . import conv, legislations, legislationsxml
-#from .datatables import DataTable
 
 
 __all__ = ['AbstractTaxBenefitSystem']
@@ -66,7 +60,6 @@ class AbstractTaxBenefitSystem(object):
     Scenario = None
     WEIGHT = None
     WEIGHT_INI = None
-    x_axes = None
 
     def __init__(self):
         # Merge prestation_by_name into column_by_name, because it is no more used.
@@ -101,6 +94,11 @@ class AbstractTaxBenefitSystem(object):
         if error is not None:
             return attributes, error
         return cls(**attributes), None
+
+    def new_scenario(self):
+        scenario = self.Scenario()
+        scenario.tax_benefit_system = self
+        return scenario
 
 
 #class TaxBenefitSystem(DataTable):
