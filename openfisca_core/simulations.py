@@ -26,14 +26,20 @@
 class Simulation(object):
     compact_legislation = None
     date = None
+    debug = False
     default_compact_legislation = None
     entities = None
     entity_by_column_name = None
+    entity_by_key_singular = None
+    persons = None
+    steps_count = None
     tax_benefit_system = None
 
-    def __init__(self, compact_legislation = None, date = None, tax_benefit_system = None):
+    def __init__(self, compact_legislation = None, date = None, debug = False, tax_benefit_system = None):
         assert date is not None
         self.date = date
+        if debug:
+            self.debug = True
         assert tax_benefit_system is not None
         self.tax_benefit_system = tax_benefit_system
 
@@ -42,12 +48,10 @@ class Simulation(object):
             else tax_benefit_system.get_compact_legislation(date)
         self.default_compact_legislation = tax_benefit_system.get_compact_legislation(date)
 
+    def calculate(self, column_name, requested_columns_name = None):
+        return self.compute(column_name, requested_columns_name = requested_columns_name).array
+
     def compute(self, column_name, requested_columns_name = None):
-        if requested_columns_name is None:
-            requested_columns_name = set()
-        else:
-            assert column_name not in requested_columns_name, 'Infinite loop. Missing values for columns: {}'.format(
-                u', '.join(sorted(requested_columns_name)).encode('utf-8'))
         return self.entity_by_column_name[column_name].compute(column_name, requested_columns_name)
 
     def set_entities(self, entities):
@@ -57,6 +61,14 @@ class Simulation(object):
             for entity in self.entities.itervalues()
             for column_name in entity.column_by_name.iterkeys()
             )
+        self.entity_by_key_singular = dict(
+            (entity.key_singular, entity)
+            for entity in self.entities.itervalues()
+            )
+        for entity in self.entities.itervalues():
+            if entity.is_persons_entity:
+                self.persons = entity
+                break
 
     def get_holder(self, column_name, default = UnboundLocalError):
         entity = self.entity_by_column_name[column_name]

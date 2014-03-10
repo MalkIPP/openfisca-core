@@ -30,6 +30,11 @@ class AbstractEntity(object):
     column_by_name = None  # Class attribute. Must be overridden by subclasses.
     count = None
     holder_by_name = None
+    key_plural = None
+    key_singular = None
+    is_persons_entity = False
+    roles_count = None  # Not used for individus
+    step_size = None
     simulation = None
     symbol = None  # Class attribute. Must be overridden by subclasses.
 
@@ -38,8 +43,8 @@ class AbstractEntity(object):
         if simulation is not None:
             self.simulation = simulation
 
-    def compute(self, column_name, requested_columns_name):
-        return self.get_or_new_holder(column_name).compute(requested_columns_name)
+    def compute(self, column_name, requested_columns_name = None):
+        return self.get_or_new_holder(column_name).compute(requested_columns_name = requested_columns_name)
 
     def copy_for_simulation(self, simulation):
         new = self.__class__(simulation = simulation)

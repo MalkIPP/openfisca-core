@@ -43,23 +43,30 @@ class Holder(object):
         if isinstance(column, columns.Prestation):
             self.formula = column.formula_constructor(holder = self)
 
-    def compute(self, requested_columns_name):
+    def compute(self, requested_columns_name = None):
         column = self.column
         date = self.entity.simulation.date
         if column.start is not None and column.start > date or column.end is not None and column.end < date:
             if self.array is None:
                 self.array = np.empty(self.entity.count, dtype = column._dtype)
                 self.array.fill(column._default)
-            return self.array
+            return self
         formula = self.formula
         if formula is None:
             if self.array is None:
                 self.array = np.empty(self.entity.count, dtype = column._dtype)
                 self.array.fill(column._default)
-            return self.array
-        return formula(requested_columns_name)
+            return self
+        return formula(requested_columns_name = requested_columns_name)
 
     def copy_for_entity(self, entity):
         new = self.__class__(column = self.column, entity = entity)
         new.array = self.array
         return new
+
+    def new_test_case_array(self):
+        array = self.array
+        if array is None:
+            return None
+        entity = self.entity
+        return array.reshape([entity.simulation.steps_count, entity.step_size]).sum(1)
