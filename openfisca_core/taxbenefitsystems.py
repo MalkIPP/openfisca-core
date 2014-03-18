@@ -46,12 +46,14 @@ class AbstractTaxBenefitSystem(object):
     DEFAULT_DECOMP_FILE = None
     entities = None  # class attribute
     ENTITIES_INDEX = None  # class attribute
+    entity_class_by_key_plural = None  # class attribute
     FILTERING_VARS = None
     json_to_attributes = staticmethod(conv.pipe(
         conv.test_isinstance(dict),
         conv.struct({}),
         ))
     legislation_json = None
+    legislation_json_by_xml_file_path = {}  # class attribute
     PARAM_FILE = None  # class attribute
     prestation_by_name = None
     REFORMS_DIR = None
@@ -64,15 +66,34 @@ class AbstractTaxBenefitSystem(object):
     def __init__(self):
         # Merge prestation_by_name into column_by_name, because it is no more used.
         # TODO: To delete once prestation_by_name is no more used.
-        self.column_by_name.update(self.prestation_by_name)
+        self.column_by_name = column_by_name = self.column_by_name.copy()
+        column_by_name.update(self.prestation_by_name)
         self.prestation_by_name = None
+
+        for column_name, column in column_by_name.iteritems():
+            formula_class = column.formula_constructor
+            if formula_class is not None:
+                for parameter in formula_class.parameters:
+                    clean_parameter = parameter[:-len('_holder')] if parameter.endswith('_holder') else parameter
+                    parameter_column = column_by_name[clean_parameter]
+                    if parameter_column.consumers is None:
+                        parameter_column.consumers = set()
+                    parameter_column.consumers.add(column_name)
 
         self.compact_legislation_by_date_str_cache = weakref.WeakValueDictionary()
 
-        legislation_tree = xml.etree.ElementTree.parse(self.PARAM_FILE)
-        legislation_xml_json = conv.check(legislationsxml.xml_legislation_to_json)(legislation_tree.getroot())
-        legislation_xml_json = conv.check(legislationsxml.validate_legislation_xml_json)(legislation_xml_json)
-        _, self.legislation_json = legislationsxml.transform_node_xml_json_to_json(legislation_xml_json)
+        legislation_xml_file_path = self.PARAM_FILE
+        legislation_json = self.legislation_json_by_xml_file_path.get(legislation_xml_file_path)
+        if legislation_json is None:
+            legislation_tree = xml.etree.ElementTree.parse(legislation_xml_file_path)
+            state = conv.State()
+            legislation_xml_json = conv.check(legislationsxml.xml_legislation_to_json)(legislation_tree.getroot(),
+                state = state)
+            legislation_xml_json = conv.check(legislationsxml.validate_legislation_xml_json)(legislation_xml_json,
+                state = state)
+            _, legislation_json = legislationsxml.transform_node_xml_json_to_json(legislation_xml_json)
+            self.legislation_json_by_xml_file_path[legislation_xml_file_path] = legislation_json
+        self.legislation_json = legislation_json
 
     def get_compact_legislation(self, date):
         date_str = date.isoformat()

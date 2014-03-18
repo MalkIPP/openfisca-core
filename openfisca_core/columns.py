@@ -39,9 +39,12 @@ from .enumerations import Enum
 class Column(object):
     _default = 0
     _dtype = float
+    _func = None
     cerfa_field = None
+    consumers = None  # list of prestation names using this column
     end = None
     entity = None
+    formula_constructor = None
     info = None
     # json_type = None  # Defined in sub-classes
     label = None
@@ -251,8 +254,6 @@ class Prestation(Column):
     Prestation is a wraper around a function which takes some arguments and return a single array.
     _P is a reserved kwargs intended to pass a tree of parametres to the function
     """
-    _func = None
-    formula_constructor = None
 
     def __init__(self, func, entity = None, end = None, label = None, start = None, survey_only = False,
             val_type = None):

@@ -28,13 +28,13 @@ from . import holders
 
 class AbstractEntity(object):
     column_by_name = None  # Class attribute. Must be overridden by subclasses.
-    count = None
+    count = 0
     holder_by_name = None
     key_plural = None
     key_singular = None
     is_persons_entity = False
     roles_count = None  # Not used for individus
-    step_size = None
+    step_size = 0
     simulation = None
     symbol = None  # Class attribute. Must be overridden by subclasses.
 
@@ -44,7 +44,9 @@ class AbstractEntity(object):
             self.simulation = simulation
 
     def compute(self, column_name, requested_columns_name = None):
-        return self.get_or_new_holder(column_name).compute(requested_columns_name = requested_columns_name)
+        holder = self.get_or_new_holder(column_name)
+        holder.calculate(requested_columns_name = requested_columns_name)
+        return holder
 
     def copy_for_simulation(self, simulation):
         new = self.__class__(simulation = simulation)
@@ -61,6 +63,9 @@ class AbstractEntity(object):
         if holder is None:
             holder = self.new_holder(column_name)
         return holder
+
+    def graph(self, column_name, edges, nodes, visited):
+        self.get_or_new_holder(column_name).graph(edges, nodes, visited)
 
     def new_holder(self, column_name):
         column = self.column_by_name[column_name]

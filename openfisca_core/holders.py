@@ -23,6 +23,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+import collections
+
 import numpy as np
 
 from . import columns
@@ -43,20 +45,16 @@ class Holder(object):
         if isinstance(column, columns.Prestation):
             self.formula = column.formula_constructor(holder = self)
 
-    def compute(self, requested_columns_name = None):
+    def calculate(self, requested_columns_name = None):
         column = self.column
         date = self.entity.simulation.date
-        if column.start is not None and column.start > date or column.end is not None and column.end < date:
-            if self.array is None:
-                self.array = np.empty(self.entity.count, dtype = column._dtype)
-                self.array.fill(column._default)
-            return self
         formula = self.formula
-        if formula is None:
+        if formula is None or column.start is not None and column.start > date or column.end is not None \
+                and column.end < date:
             if self.array is None:
                 self.array = np.empty(self.entity.count, dtype = column._dtype)
                 self.array.fill(column._default)
-            return self
+            return self.array
         return formula(requested_columns_name = requested_columns_name)
 
     def copy_for_entity(self, entity):
@@ -64,9 +62,52 @@ class Holder(object):
         new.array = self.array
         return new
 
+    def graph(self, edges, nodes, visited):
+        column = self.column
+        if self in visited:
+            return
+        visited.add(self)
+        nodes.append(dict(
+            id = column.name,
+            group = self.entity.key_plural,
+            label = column.name,
+            title = column.label,
+            ))
+        date = self.entity.simulation.date
+        formula = self.formula
+        if formula is None or column.start is not None and column.start > date or column.end is not None \
+                and column.end < date:
+            return
+        formula.graph_parameters(edges, nodes, visited)
+
     def new_test_case_array(self):
         array = self.array
         if array is None:
             return None
         entity = self.entity
         return array.reshape([entity.simulation.steps_count, entity.step_size]).sum(1)
+
+    def to_json(self, with_array = False):
+        self_json = self.column.to_json()
+        self_json['entity'] = self.entity.key_plural  # Override entity symbol given by column. TODO: Remove.
+        formula = self.formula
+        if formula is not None:
+            formula_json = formula.to_json()
+            formula_json.pop('@type', None)
+            self_json.update(formula_json)
+
+        entity = self.entity
+        simulation = entity.simulation
+        self_json['consumers'] = consumers_json = []
+        for consumer in sorted(self.column.consumers or []):
+            consumer_holder = simulation.get_or_new_holder(consumer)
+            consumer_column = consumer_holder.column
+            consumers_json.append(collections.OrderedDict((
+                ('entity', consumer_holder.entity.key_plural),
+                ('label', consumer_column.label),
+                ('name', consumer_column.name),
+                )))
+
+        if with_array and self.array is not None:
+            self_json['array'] = self.array.tolist()
+        return self_json
