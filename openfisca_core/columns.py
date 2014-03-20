@@ -102,6 +102,8 @@ class Column(object):
             if isinstance(start, datetime.date):
                 start = start.isoformat()
             self_json['start'] = start
+        if self.survey_only:
+            self_json['survey_only'] = self.survey_only
         if self.val_type is not None:
             self_json['val_type'] = self.val_type
         return self_json
@@ -255,10 +257,10 @@ class Prestation(Column):
     _P is a reserved kwargs intended to pass a tree of parametres to the function
     """
 
-    def __init__(self, func, entity = None, end = None, label = None, start = None, survey_only = False,
-            val_type = None):
-        super(Prestation, self).__init__(entity = entity, end = end, label = label, start = start,
-            survey_only = survey_only, val_type = val_type)
+    def __init__(self, func, cerfa_field = None, end = None, entity = None, label = None, start = None,
+            survey_only = False, val_type = None):
+        super(Prestation, self).__init__(cerfa_field = cerfa_field, entity = entity, end = end, label = label,
+            start = start, survey_only = survey_only, val_type = val_type)
 
         assert func is not None, 'A function to compute the prestation should be provided'
         self._func = func
