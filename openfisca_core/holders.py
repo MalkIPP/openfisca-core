@@ -42,20 +42,18 @@ class Holder(object):
         self.column = column
         assert entity is not None
         self.entity = entity
-        if column.formula_constructor is not None:
-            self.formula = column.formula_constructor(holder = self)
 
-    def calculate(self, requested_columns_name = None):
+    def calculate(self, lazy = False, requested_formulas = None):
         column = self.column
         date = self.entity.simulation.date
         formula = self.formula
         if formula is None or column.start is not None and column.start > date or column.end is not None \
                 and column.end < date:
-            if self.array is None:
-                self.array = np.empty(self.entity.count, dtype = column._dtype)
-                self.array.fill(column._default)
+            if not lazy and self.array is None:
+                self.array = np.empty(self.entity.count, dtype = column.dtype)
+                self.array.fill(column.default)
             return self.array
-        return formula(requested_columns_name = requested_columns_name)
+        return formula.calculate(lazy = lazy, requested_formulas = requested_formulas)
 
     def copy_for_entity(self, entity):
         new = self.__class__(column = self.column, entity = entity)
@@ -92,10 +90,7 @@ class Holder(object):
         self_json['entity'] = self.entity.key_plural  # Override entity symbol given by column. TODO: Remove.
         formula = self.formula
         if formula is not None:
-            formula_json = formula.to_json()
-            formula_json.pop('@type', None)
-            self_json.update(formula_json)
-
+            self_json['formula'] = formula.to_json()
         entity = self.entity
         simulation = entity.simulation
         self_json['consumers'] = consumers_json = []
