@@ -116,6 +116,155 @@ class AlternativeFormula(AbstractFormula):
             ))
 
 
+class DatedFormula(AbstractFormula):
+    dated_formulas = None
+    dated_formulas_class = None  # Class attribute. List of formulas sorted by descending preference
+
+    def __init__(self, holder = None):
+        super(DatedFormula, self).__init__(holder = holder)
+
+        self.dated_formulas = [
+            dict(
+                end = dated_formula_class['end'],
+                formula = dated_formula_class['formula_class'](holder = holder),
+                start = dated_formula_class['start'],
+                )
+            for dated_formula_class in self.dated_formulas_class
+            ]
+
+    def calculate(self, lazy = False, requested_formulas = None):
+        holder = self.holder
+        column = holder.column
+
+        if requested_formulas is None:
+            requested_formulas = set()
+        elif lazy:
+            if self in requested_formulas:
+                return holder.array
+        else:
+            assert self not in requested_formulas, 'Infinite loop in formula {}. Missing values for columns: {}'.format(
+                column.name,
+                u', '.join(sorted(set(
+                    requested_formula.holder.column.name
+                    for requested_formula in requested_formulas
+                    ))).encode('utf-8'),
+                )
+
+        if holder.array is not None:
+            return holder.array
+#        if holder.disabled:
+#            return holder.array
+
+        entity = holder.entity
+        simulation = entity.simulation
+        datesim = simulation.compact_legislation.datesim
+        requested_formulas.add(self)
+        for dated_formula in self.dated_formulas:
+            if dated_formula['start'] <= datesim <= dated_formula['end']:
+                array = dated_formula['formula'].calculate(lazy = lazy, requested_formulas = requested_formulas)
+                if array is not None:
+                    holder.array = array
+                    requested_formulas.remove(self)
+                    return array
+
+        holder.array = np.empty(entity.count, dtype = column.dtype)
+        holder.array.fill(column.default)
+        requested_formulas.remove(self)
+        return holder.array
+
+    def graph_parameters(self, edges, nodes, visited):
+        """Recursively build a graph of formulas."""
+        for dated_formula in self.dated_formulas:
+            dated_formula['formula'].graph_parameters(edges, nodes, visited)
+
+    @classmethod
+    def set_dependencies(cls, column, tax_benefit_system):
+        for dated_formula_class in cls.dated_formulas_class:
+            dated_formula_class['formula_class'].set_dependencies(column, tax_benefit_system)
+
+    def to_json(self):
+        return collections.OrderedDict((
+            ('@type', u'DatedFormula'),
+            ('dated_formulas', [
+                dict(
+                    end = dated_formula['end'],
+                    formula = dated_formula['formula'].to_json(),
+                    start = dated_formula['start'],
+                    )
+                for dated_formula in self.dated_formulas
+                ]),
+            ))
+
+
+class SelectFormula(AbstractFormula):
+    formula_by_main_variable = None
+    formula_constructor_by_main_variable = None  # Class attribute. List of formulas sorted by descending preference
+
+    def __init__(self, holder = None):
+        super(SelectFormula, self).__init__(holder = holder)
+
+        self.formula_by_main_variable = collections.OrderedDict(
+            (main_variable, formula_constructor(holder = holder))
+            for main_variable, formula_constructor in self.formula_constructor_by_main_variable.iteritems()
+            )
+
+    def calculate(self, lazy = False, requested_formulas = None):
+        holder = self.holder
+        column = holder.column
+
+        if requested_formulas is None:
+            requested_formulas = set()
+        elif lazy:
+            if self in requested_formulas:
+                return holder.array
+        else:
+            assert self not in requested_formulas, 'Infinite loop in formula {}. Missing values for columns: {}'.format(
+                column.name,
+                u', '.join(sorted(set(
+                    requested_formula.holder.column.name
+                    for requested_formula in requested_formulas
+                    ))).encode('utf-8'),
+                )
+
+        if holder.array is not None:
+            return holder.array
+#        if holder.disabled:
+#            return holder.array
+
+        entity = holder.entity
+        simulation = entity.simulation
+        requested_formulas.add(self)
+        for main_variable, formula in self.formula_by_main_variable.iteritems():
+            main_array = simulation.calculate(main_variable, lazy = True, requested_formulas = requested_formulas)
+            if main_array is not None:
+                selected_formula = formula
+                break
+        else:
+            selected_formula = self.formula_by_main_variable.values()[0]
+        holder.array = array = selected_formula.calculate(lazy = lazy, requested_formulas = requested_formulas)
+        requested_formulas.remove(self)
+        return array
+
+    def graph_parameters(self, edges, nodes, visited):
+        """Recursively build a graph of formulas."""
+        for formula in self.formula_by_main_variable.itervalues():
+            formula.graph_parameters(edges, nodes, visited)
+
+    @classmethod
+    def set_dependencies(cls, column, tax_benefit_system):
+        for formula_constructor in cls.formula_constructor_by_main_variable.itervalues():
+            formula_constructor.set_dependencies(column, tax_benefit_system)
+
+    def to_json(self):
+        return collections.OrderedDict((
+            ('@type', u'SelectFormula'),
+            ('formula_by_main_variable', collections.OrderedDict(
+                (main_variable, formula.to_json())
+                for main_variable, formula in self.formula_by_main_variable.iteritems()
+                )),
+            ))
+
+
 class SimpleFormula(AbstractFormula):
     function = None  # Class attribute. Overridden by subclasses
     holder_by_parameter = None
@@ -204,7 +353,7 @@ class SimpleFormula(AbstractFormula):
             entity.key_plural, column.name, self.get_arguments_str(), array).encode('utf-8')
         assert array.size == entity.count, \
             u"Function {}@{}({}) returns an array of size {}, but size {} is expected for {}".format(entity.key_plural,
-            column.name, self.get_arguments_str(), array.size, entity.count,entity.key_singular).encode('utf-8')
+            column.name, self.get_arguments_str(), array.size, entity.count, entity.key_singular).encode('utf-8')
         if array.dtype != column.dtype:
             array = array.astype(column.dtype)
         if simulation.debug:
