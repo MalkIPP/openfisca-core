@@ -286,7 +286,34 @@ class SimpleFormula(AbstractFormula):
             holder_by_parameter[parameter] = parameter_holder = simulation.get_or_new_holder(clean_parameter)
 
     def any_by_roles(self, array_or_holder, entity = None, roles = None):
-        return self.sum_by_entity(array_or_holder, entity = entity, roles = roles)
+        holder = self.holder
+        target_entity = holder.entity
+        simulation = target_entity.simulation
+        persons = simulation.persons
+        if entity is None:
+            entity = holder.entity
+        else:
+            assert entity in simulation.entity_by_key_singular, u"Unknown entity: {}".format(entity).encode('utf-8')
+            entity = simulation.entity_by_key_singular[entity]
+        assert not entity.is_persons_entity
+        if isinstance(array_or_holder, holders.Holder):
+            assert array_or_holder.entity.is_persons_entity
+            array = array_or_holder.array
+        else:
+            array = array_or_holder
+            assert isinstance(array, np.ndarray), u"Expected a holder or a Numpy array. Got: {}".format(array).encode(
+                'utf-8')
+            assert array.size == persons.count, u"Expected an array of size {}. Got: {}".format(persons.count,
+                array.size)
+        entity_index_array = persons.holder_by_name['id' + entity.symbol].array
+        if roles is None:
+            roles = range(entity.roles_count)
+        target_array = np.zeros(entity.count, dtype = np.bool)
+        for role in roles:
+            # TODO Mettre les filtres en cache dans la simulation
+            boolean_filter = persons.holder_by_name['qui' + entity.symbol].array == role
+            target_array[entity_index_array[boolean_filter]] += array[boolean_filter]
+        return target_array
 
     def calculate(self, lazy = False, requested_formulas = None):
         holder = self.holder
@@ -318,6 +345,8 @@ class SimpleFormula(AbstractFormula):
         required_parameters = set(self.holder_by_parameter.iterkeys()).union(
             (self.legislation_accessor_by_name or {}).iterkeys())
         arguments = {}
+        if simulation.debug and not simulation.debug_all or simulation.trace:
+            has_only_default_arguments = True
         for parameter, parameter_holder in self.holder_by_parameter.iteritems():
             parameter_array = parameter_holder.calculate(lazy = lazy, requested_formulas = requested_formulas)
             if parameter_array is None:
@@ -328,6 +357,9 @@ class SimpleFormula(AbstractFormula):
             # When parameter ends with "_holder" suffix, use holder as argument instead of its array.
             # It is a hack until we use static typing annotations of Python 3 (cf PEP 3107).
             arguments[parameter] = parameter_holder if parameter.endswith('_holder') else parameter_holder.array
+            if (simulation.debug and not simulation.debug_all or simulation.trace) and has_only_default_arguments \
+                    and np.any(parameter_array != parameter_holder.column.default):
+                has_only_default_arguments = False
 
         if self.requires_default_legislation:
             required_parameters.add('_defaultP')
@@ -347,8 +379,6 @@ class SimpleFormula(AbstractFormula):
         assert provided_parameters == required_parameters, 'Formula {} requires missing parameters : {}'.format(
             u', '.join(sorted(required_parameters - provided_parameters)).encode('utf-8'))
 
-        if simulation.debug:
-            log.info(u'--> {}@{}({})'.format(entity.key_plural, column.name, self.get_arguments_str()))
         try:
             array = self.function(**arguments)
         except:
@@ -362,9 +392,14 @@ class SimpleFormula(AbstractFormula):
             column.name, self.get_arguments_str(), array.size, entity.count, entity.key_singular).encode('utf-8')
         if array.dtype != column.dtype:
             array = array.astype(column.dtype)
-        if simulation.debug:
-            log.info(u'<-- {}@{}: {}'.format(entity.key_plural, column.name, array))
+        if simulation.debug and (simulation.debug_all or not has_only_default_arguments):
+            log.info(u'<=> {}@{}({}) --> {}'.format(entity.key_plural, column.name, self.get_arguments_str(), array))
         holder.array = array
+        if simulation.trace:
+            simulation.traceback.append(dict(
+                default_arguments = has_only_default_arguments,
+                holder = holder,
+                ))
         requested_formulas.remove(self)
         return array
 
@@ -574,7 +609,7 @@ class SimpleFormula(AbstractFormula):
         entity_index_array = persons.holder_by_name['id' + entity.symbol].array
         if roles is None:
             roles = range(entity.roles_count)
-        target_array = np.zeros(entity.count, dtype = array.dtype)
+        target_array = np.zeros(entity.count, dtype = array.dtype if array.dtype != np.bool else np.int16)
         for role in roles:
             # TODO Mettre les filtres en cache dans la simulation
             boolean_filter = persons.holder_by_name['qui' + entity.symbol].array == role
