@@ -397,3 +397,4 @@ def scale_tax_scales(bar_dict, factor):
             else:
                 setattr(out, key, bar)
         return out
+    
